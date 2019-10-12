@@ -1,31 +1,46 @@
-
+version: '{build}'
+skip_tags: true
+image: Visual Studio 2019
+clone_depth: 3
 environment:
+  CMAKE_BUILD_PARALLEL_LEVEL: 4
+  AWS_ACCESS_KEY_ID:
+    secure: 7jhk0oV/vjFsOcsAHLMUcNGUGLuGmnuPxGH0ce/Vky8=
+  AWS_SECRET_ACCESS_KEY:
+    secure: 5KKYpsIHwYHHh5ud0U7Ss0rLumv6G8tkS6abh1B9aq4wY6+1kq5fN/3E5BsdBVKy
+  AWS_DEFAULT_REGION: us-east-1
+  S3_CONFIG_VOLATILE: --acl public-read --cache-control "public, must-revalidate, proxy-revalidate, max-age=0"
+  GIT_FORMAT: '%%H'
   matrix:
-    - GENERATOR: "Visual Studio 12 2013 Win64"
-      CONFIG: Debug
-
-    - GENERATOR: "Visual Studio 12 2013 Win64"
-      CONFIG: Release
-
-    - GENERATOR: "Visual Studio 14 2015 Win64"
-      CONFIG: Debug
-
-    - GENERATOR: "Visual Studio 14 2015 Win64"
-      CONFIG: Release
-
-    - GENERATOR: "Visual Studio 12 2013"
-      CONFIG: Debug
-
-    - GENERATOR: "Visual Studio 12 2013"
-      CONFIG: Release
-
-    - GENERATOR: "Visual Studio 14 2015"
-      CONFIG: Debug
-
-    - GENERATOR: "Visual Studio 14 2015"
-      CONFIG: Release
-
+  - ARCH: x64
+    PLATFORM: x64
+  - ARCH: x86
+    PLATFORM: Win32
+matrix:
+  fast_finish: true
 build_script:
-  - git submodule update --init
-  - cmake "-G%GENERATOR%" -H. -B_builds
-  - cmake --build _builds --config "%CONFIG%"
+- cmd: >-
+    mkdir build
+
+    cd build
+
+    cmake -G "Visual Studio 16 2019" -A %PLATFORM% -DSPIRV_CROSS_STATIC=OFF -DSPIRV_CROSS_SHARED=ON -DSPIRV_CROSS_CLI=OFF -DSPIRV_CROSS_ENABLE_TESTS=OFF -DSPIRV_CROSS_SKIP_INSTALL=ON -DSPIRV_CROSS_WERROR=ON -DSPIRV_CROSS_FORCE_PIC=ON ..
+
+    cmake --build . --config Release
+
+    aws s3 cp Release\spirv-cross-c-shared.dll s3://build.lwjgl.org/nightly/windows/%ARCH%/spirv-cross.dll %S3_CONFIG_VOLATILE%
+
+    cd ..
+
+    git log --first-parent --pretty=format:%GIT_FORMAT% HEAD~2..HEAD~1 > revision.git
+
+    aws s3 cp revision.git s3://build.lwjgl.org/nightly/windows/%ARCH%/spirv-cross.dll.git %S3_CONFIG_VOLATILE%
+test: off
+notifications:
+- provider: Email
+  to:
+  - iotsakp@gmail.com
+  subject: SPIRV-Cross CI
+  on_build_success: true
+  on_build_failure: true
+  on_build_status_changed: true

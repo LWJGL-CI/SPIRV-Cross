@@ -1,72 +1,123 @@
-language:
-  - cpp
-  - python
-
-python: 3.7
+git:
+  depth: 3
+env:
+  global:
+  - secure: "JlCs3RIx6D7Kx2kbC/bMx63E0Ov0PBx0GTCaZ3bil2i6oTEEiWq/MedTWYecn/n4CeNptqTaSoqxsm9Z7YwcZ1ZD8WGfpu0Wd6jKDyUH0jbD5V0mR0LDnoX5spT/lOfFdmJ1BzA9zmGcEnOVBKvXCJZhyS9ae2oiQRUaDsCD4mg4+gs5G1Ha8r9vFdQYAC28xaM+CtU1YWZQZPEsnDxP05ZqRJilaQJcan0E/tg2CDNU8zFxnPyULVECYb9oM7pWURgPXGiSIKmcm0gv0DlNUNRi+FeIyFTIsG6NmXgUsMxl7fNkvUlf2Mtb7oMcjX4H90R0VP2/rBUa9lcxIdST9UYKzsueKLBmfv99oLr3L/B9Z4CPR84NokZtWXfEJzgAy8JX9+ygDzDsw23cX9pcrJphYeoOz29LFXhHiNe2bEuAfoAzkFtq39uw7zCVa0czMi4aiWS513O6ODYDHB/q0FC20xjeXIan7fzXBLt7UYGHGcNkZpEKK2h2KDIoJK1JYHrZwb8UiBac/evFxfYCIIfpwLG58wq+VtvI5qK30nFYKLk2yLW9pa/EeHLtAvY938D4E6uvCK4DvBuGmAQxBl2YK43vH2HN7FFftk1CW2RSq4+UDizthbAFfG5YvwCYohzDB8KYdQWF+ugibNCWdZD7VIb9pLSJkFHexsvV664="
+  - secure: "Epeup/BxjeQpOVJ8Gv65AE+MjT9zKgcLp7bIroonyKYe+KO01efuu/V6FtokUfU5tMEByiog46V8EXWPVzmaxEbr0+pq0QlbBjiC+zSofB4diTQJoAPn4Lghemt0nsxzH27twmuDz3jXz21BFp1Eo3JIYPUDiYuRNF7VO9vSTmp8hpyDwg065PJSmTbEh6MJNKB+9XLm8VnfnBILT0okHtuhaH4o+3LUlc1cJDjKWk8EncqzsKRr3C2b6+iz5POFRxrOq7fBmqi4KVNSgxes9gHiuU2LxVJSGbn1g4gLDUu2o+RT7U21yQmbg6HetwN9fvt1JaXyJk8haiD5pTzjXRAzsjgEuWAGXHINYEE2PpTY/+wjs4IZ96E25+fFFqHHCl90v8RnpIPGUpohfGNfxnTEPiZSMIJZNPMKXsi18S+YOvkS4Qd+IOxTOhaxtD0Bp++3Zrbu5R8AKd3GXFp0NWk2RR1otpFptCcg7BUwnvG0Bpg8bGz7OG+ORs1/snf7xrPG6It1TeAGFEhpZlBusnmp3rzOpBlpcEmiasnQQ4pwmYSKa1BTyhXWNx2yRK7goGwnj4NK/MzmGs1ezTxq21q1MVI94Ll7ZoMZ3fBDxH2CNCJ3hTRwCOTXWnmWxOcQgp6Dh9aBJL+J3JArJ9Lc2V1BcRK0Yn7OfehbppTepfg="
+  - AWS_DEFAULT_REGION: "us-east-1"
+  - S3_PARAMS: '"--acl public-read --cache-control \"public,must-revalidate,proxy-revalidate,max-age=0\""'
+  - CMAKE_BUILD_PARALLEL_LEVEL: 4
+  - LINUX_CMAKE_PARAMS: '"-DSPIRV_CROSS_STATIC=OFF -DSPIRV_CROSS_SHARED=ON -DSPIRV_CROSS_CLI=OFF -DSPIRV_CROSS_ENABLE_TESTS=OFF -DSPIRV_CROSS_SKIP_INSTALL=ON -DSPIRV_CROSS_WERROR=ON -DSPIRV_CROSS_FORCE_PIC=ON"'
 
 matrix:
   include:
-    - os: linux
-      dist: trusty
-      compiler: gcc
-      env:
-        - GENERATOR="Unix Makefiles"
-        - ARTIFACT=gcc-trusty-64bit
-    - os: linux
-      dist: trusty
-      compiler: clang
-      env:
-        - GENERATOR="Unix Makefiles"
-        - ARTIFACT=clang-trusty-64bit
-    - os: osx
-      compiler: clang
-      osx_image: xcode10
-      env:
-        - GENERATOR="Unix Makefiles"
-        - ARTIFACT=clang-macos-64bit
-    - os: windows
-      before_install:
-        - choco install python3
-        - export PATH="/c/Python38:/c/Python38/Scripts:$PATH"
-      env:
-        - GENERATOR="Visual Studio 15 2017"
-        - ARTIFACT=vs2017-32bit
-    - os: windows
-      before_install:
-        - choco install python3
-        - export PATH="/c/Python38:/c/Python38/Scripts:$PATH"
-      env:
-        - GENERATOR="Visual Studio 15 2017 Win64"
-        - ARTIFACT=vs2017-64bit
 
-before_script:
-  - "./checkout_glslang_spirv_tools.sh"
+  # -----------------
+  - name: "Linux x64"
+  # -----------------
 
-script:
-  - if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then PYTHON3=$(which python); fi
-  - if [[ "$TRAVIS_OS_NAME" != "windows" ]]; then PYTHON3=$(which python3); fi
-  - "./build_glslang_spirv_tools.sh Release"
-  - mkdir build
-  - cd build
-  - cmake .. -DSPIRV_CROSS_WERROR=ON -DSPIRV_CROSS_MISC_WARNINGS=ON -DSPIRV_CROSS_SHARED=ON -DCMAKE_INSTALL_PREFIX=output -DCMAKE_BUILD_TYPE=Release -G "${GENERATOR}" -DPYTHON_EXECUTABLE:FILEPATH="${PYTHON3}" -DSPIRV_CROSS_ENABLE_TESTS=ON
-  - cmake --build . --config Release
-  - cmake --build . --config Release --target install
-  - ctest --verbose -C Release
-  - cd ..
+    dist: xenial
+    language: c
+    compiler: gcc
 
-before_deploy:
-  - REV=${ARTIFACT}-$(git rev-parse --short=10 HEAD)
-  - cd build/output
-  - tar cf spirv-cross-${REV}.tar *
-  - gzip spirv-cross-${REV}.tar
-  - cd ../..
-  - export FILE_TO_UPLOAD=build/output/spirv-cross-${REV}.tar.gz
+    addons:
+      apt:
+        packages:
+        - cmake
+        - gcc-4.8
+        - g++-4.8
 
-deploy:
-  provider: releases
-  api_key:
-    secure: c7YEOyzhE19TFo76UnbLWk/kikRQxsHsOxzkOqN6Q2aL8joNRw5kmcG84rGd+Rf6isX62cykCzA6qHkyJCv9QTIzcyXnLju17rLvgib7cXDcseaq8x4mFvet2yUxCglthDpFY2M2LB0Aqws71lPeYIrKXa6hCFEh8jO3AWxnaor7O3RYfNZylM9d33HgH6KLT3sDx/cukwBstmKeg7EG9OUnrSvairkPW0W2+jlq3SXPlq/WeVhf8hQs3Yg0BluExGbmLOwe9EaeUpeGuJMyHRxXypnToQv1/KwoScKpap5tYxdNWiwRGZ4lYcmKrjAYVvilTioh654oX5LQpn34mE/oe8Ko9AaATkSaoiisRFp6meWtnB39oFBoL5Yn15DqLQpRXPr1AJsnBXSGAac3aDBO1j4MIqTHmYlYlfRw3n2ZsBaFaTZnv++438SNQ54nkivyoDTIWjoOmYa9+K4mQc3415RDdQmjZTJM+lu+GAlMmNBTVbfNvrbU55Usu9Lo6BZJKKdUMvdBB78kJ5FHvcBlL+eMgmk1pABQY0IZROCt7NztHcv1UmAxoWNxveSFs5glydPNNjNS8bogc4dzBGYG0KMmILbBHihVbY2toA1M9CMdDHdp+LucfDMmzECmYSEmlx0h8win+Jjb74/qpOhaXuUZ0NnzVgCOyeUYuMQ=
-  file: "${FILE_TO_UPLOAD}"
-  skip_cleanup: true
-  on:
-    tags: true
+    before_install:
+    - pip install --user awscli
+    - export PATH=$PATH:$HOME/.local/bin
+
+    script:
+    - mkdir build
+    - cd build
+    - "CC=gcc-4.8 CXX=g++-4.8 cmake $LINUX_CMAKE_PARAMS -DCMAKE_C_FLAGS=\"-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0\" .."
+    - cmake --build .
+    - strip libspirv-cross-c-shared.so
+    - "git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > revision.git"
+    - "aws s3 cp libspirv-cross-c-shared.so s3://build.lwjgl.org/nightly/linux/x64/libspirv-cross.so $S3_PARAMS"
+    - "aws s3 cp revision.git s3://build.lwjgl.org/nightly/linux/x64/libspirv-cross.so.git $S3_PARAMS"
+
+  # -----------------
+  - name: "Linux arm32"
+  # -----------------
+    dist: xenial
+    language: c
+    compiler: gcc
+
+    addons:
+      apt:
+        packages:
+        - cmake
+        - gcc-4.8-arm-linux-gnueabihf
+        - g++-4.8-arm-linux-gnueabihf
+        - libc6-dev-armhf-cross
+
+    before_install:
+    - pip install --user awscli
+    - export PATH=$PATH:$HOME/.local/bin
+
+    script:
+    - mkdir build
+    - cd build
+    - "CC=arm-linux-gnueabihf-gcc-4.8 CXX=arm-linux-gnueabihf-g++-4.8 cmake $LINUX_CMAKE_PARAMS -DCMAKE_C_FLAGS=\"-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0\" .."
+    - cmake --build .
+    - arm-linux-gnueabihf-strip libspirv-cross-c-shared.so
+    - "git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > revision.git"
+    - "aws s3 cp libspirv-cross-c-shared.so s3://build.lwjgl.org/nightly/linux/arm32/libspirv-cross.so $S3_PARAMS"
+    - "aws s3 cp revision.git s3://build.lwjgl.org/nightly/linux/arm32/libspirv-cross.so.git $S3_PARAMS"
+
+  # -----------------
+  - name: "Linux arm64"
+  # -----------------
+    dist: xenial
+    language: c
+    compiler: gcc
+
+    addons:
+      apt:
+        packages:
+        - cmake
+        - gcc-4.8-aarch64-linux-gnu
+        - g++-4.8-aarch64-linux-gnu
+        - libc6-dev-arm64-cross
+
+    before_install:
+    - pip install --user awscli
+    - export PATH=$PATH:$HOME/.local/bin
+
+    script:
+    - mkdir build
+    - cd build
+    - "CC=aarch64-linux-gnu-gcc-4.8 CXX=aarch64-linux-gnu-g++-4.8 cmake $LINUX_CMAKE_PARAMS -DCMAKE_C_FLAGS=\"-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0\" .."
+    - cmake --build .
+    - aarch64-linux-gnu-strip libspirv-cross-c-shared.so
+    - "git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > revision.git"
+    - "aws s3 cp libspirv-cross-c-shared.so s3://build.lwjgl.org/nightly/linux/arm64/libspirv-cross.so $S3_PARAMS"
+    - "aws s3 cp revision.git s3://build.lwjgl.org/nightly/linux/arm64/libspirv-cross.so.git $S3_PARAMS"
+
+  # -----------------
+  - name: "macOS"
+  # -----------------
+    language: objective-c
+    osx_image: xcode11.3
+    compiler: clang
+
+    before_install:
+    - brew update
+
+    install:
+    - brew install awscli
+
+    script:
+    - mkdir build
+    - cd build
+    - "cmake $LINUX_CMAKE_PARAMS -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9 .."
+    - cmake --build .
+    - strip -u -r libspirv-cross-c-shared.dylib
+    - "git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > revision.git"
+    - "aws s3 cp libspirv-cross-c-shared.dylib s3://build.lwjgl.org/nightly/macosx/x64/libspirv-cross.dylib $S3_PARAMS"
+    - "aws s3 cp revision.git s3://build.lwjgl.org/nightly/macosx/x64/libspirv-cross.dylib.git $S3_PARAMS"
