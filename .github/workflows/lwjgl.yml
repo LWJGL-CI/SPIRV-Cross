@@ -1,0 +1,169 @@
+name: LWJGL Build
+
+on:
+  push:
+    branches:
+      - master
+
+env:
+  AWS_DEFAULT_REGION: us-east-1
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  S3_PARAMS: --cache-control "public,must-revalidate,proxy-revalidate,max-age=0"
+  CMAKE_BUILD_PARALLEL_LEVEL: 4
+  SPVC_PARAMS: -DSPIRV_CROSS_STATIC=OFF -DSPIRV_CROSS_SHARED=ON -DSPIRV_CROSS_CLI=OFF -DSPIRV_CROSS_ENABLE_TESTS=OFF -DSPIRV_CROSS_SKIP_INSTALL=ON -DSPIRV_CROSS_WERROR=ON -DSPIRV_CROSS_FORCE_PIC=ON
+
+jobs:
+  linux:
+    name: Linux
+    runs-on: ubuntu-latest
+    container:
+      image: centos:7
+    strategy:
+      fail-fast: false
+      matrix:
+        ARCH: [x64]
+        include:
+          - ARCH: x64
+    steps:
+      - run: |
+          yum -y install https://packages.endpointdev.com/rhel/7/os/x86_64/endpoint-repo.x86_64.rpm
+          yum -y install git
+        name: Upgrade git
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 3
+      - run: |
+          yum -y install epel-release
+          yum -y update
+        name: Configure yum
+      - run: |
+          yum -y install centos-release-scl
+          yum -y install devtoolset-11-gcc-c++
+          yum -y install cmake3 awscli
+        name: Install build dependencies
+      - run: |
+          source scl_source enable devtoolset-11 || true
+          cmake3 -B build ${{env.SPVC_PARAMS}} -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0"
+        name: Configure build
+      - run: |
+          source scl_source enable devtoolset-11 || true
+          cmake3 --build build --parallel
+          strip build/libspirv-cross-c-shared.so
+        name: Build
+      - run: aws s3 cp build/libspirv-cross-c-shared.so s3://lwjgl-build/nightly/linux/${{matrix.ARCH}}/libspirv-cross.so $S3_PARAMS
+        name: Upload artifact
+      - run: |
+          git config --global --add safe.directory $PWD
+          git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > libspirv-cross.so.git
+          aws s3 cp libspirv-cross.so.git s3://lwjgl-build/nightly/linux/${{matrix.ARCH}}/ $S3_PARAMS
+        name: Upload git revision
+
+  linux-cross:
+    name: Linux Cross
+    runs-on: ubuntu-18.04
+    strategy:
+      fail-fast: false
+      matrix:
+        ARCH: [arm32, arm64, mips64]
+        include:
+          # -----
+          - ARCH: arm32
+            PACKAGES: gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf libc6-dev-armhf-cross
+            CC: CC=arm-linux-gnueabihf-gcc CXX=arm-linux-gnueabihf-g++
+            CMAKE_PARAMS: -DCMAKE_TOOLCHAIN_FILE=../XCompile-lwjgl.cmake -DSYSTEM_NAME=Linux -DSYSTEM_PROCESSOR=arm
+            STRIP: arm-linux-gnueabihf-strip
+          # -----
+          - ARCH: arm64
+            PACKAGES: gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libc6-dev-arm64-cross
+            CC: CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++
+            CMAKE_PARAMS: -DCMAKE_TOOLCHAIN_FILE=../XCompile-lwjgl.cmake -DSYSTEM_NAME=Linux -DSYSTEM_PROCESSOR=aarch64
+            STRIP: aarch64-linux-gnu-strip
+          # -----
+          - ARCH: mips64
+            PACKAGES: gcc-mips64el-linux-gnuabi64 g++-mips64el-linux-gnuabi64 libc6-dev-mips64el-cross
+            CC: CC=mips64el-linux-gnuabi64-gcc CXX=mips64el-linux-gnuabi64-g++
+            CMAKE_PARAMS: -DCMAKE_TOOLCHAIN_FILE=../XCompile-lwjgl.cmake -DSYSTEM_NAME=Linux -DSYSTEM_PROCESSOR=mips64
+            STRIP: mips64el-linux-gnuabi64-strip
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 3
+      - run: |
+          sudo apt-get update
+          sudo apt-get -yq install ${{matrix.PACKAGES}}
+        name: Install dependencies
+      - run: ${{matrix.CC}} cmake -B build ${{env.SPVC_PARAMS}} -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0" ${{matrix.CMAKE_PARAMS}}
+        name: Configure build
+      - run: |
+          cmake --build build --parallel
+          ${{matrix.STRIP}} build/libspirv-cross-c-shared.so
+        name: Build
+      - run: aws s3 cp build/libspirv-cross-c-shared.so s3://lwjgl-build/nightly/linux/${{matrix.ARCH}}/libspirv-cross.so $S3_PARAMS
+        name: Upload artifact
+      - run: |
+          git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > libspirv-cross.so.git
+          aws s3 cp libspirv-cross.so.git s3://lwjgl-build/nightly/linux/${{matrix.ARCH}}/ $S3_PARAMS
+        name: Upload git revision
+
+  macos:
+    name: macOS
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ARCH: [x64, arm64]
+        include:
+          - ARCH: x64
+            CMAKE_PARAMS: -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
+          - ARCH: arm64
+            CMAKE_PARAMS: -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_TOOLCHAIN_FILE=../XCompile-lwjgl.cmake -DSYSTEM_NAME=Darwin -DSYSTEM_PROCESSOR=aarch64
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 3
+      - run: cmake -B build ${{env.SPVC_PARAMS}} -DCMAKE_BUILD_TYPE=Release ${{matrix.CMAKE_PARAMS}}
+        name: Configure build
+      - run: |
+          cmake --build build --parallel
+          strip -u -r build/libspirv-cross-c-shared.dylib
+        name: Build
+      - run: aws s3 cp build/libspirv-cross-c-shared.dylib s3://lwjgl-build/nightly/macosx/${{matrix.ARCH}}/libspirv-cross.dylib $S3_PARAMS
+        name: Upload artifact
+      - run: |
+          git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > libspirv-cross.dylib.git
+          aws s3 cp libspirv-cross.dylib.git s3://lwjgl-build/nightly/macosx/${{matrix.ARCH}}/ $S3_PARAMS
+        name: Upload git revision
+
+  windows:
+    name: Windows
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ARCH: [x86, x64, arm64]
+        include:
+          - ARCH: x86
+            PLATFORM: Win32
+          - ARCH: x64
+            PLATFORM: x64
+          - ARCH: arm64
+            PLATFORM: ARM64
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 3
+      - run: cmake -B build -G "Visual Studio 17 2022" -A ${{matrix.PLATFORM}} ${{env.SPVC_PARAMS}}
+        shell: cmd
+        name: Configure build
+      - run: cmake --build build --parallel --config Release
+        shell: cmd
+        name: Build
+      - run: aws s3 cp build\Release\spirv-cross-c-shared.dll s3://lwjgl-build/nightly/windows/${{matrix.ARCH}}/spirv-cross.dll ${{env.S3_PARAMS}}
+        shell: cmd
+        name: Upload artifact
+      - run: |
+          git log --first-parent --pretty=format:%%H HEAD~2..HEAD~1 > spirv-cross.dll.git
+          aws s3 cp spirv-cross.dll.git s3://lwjgl-build/nightly/windows/${{matrix.ARCH}}/ ${{env.S3_PARAMS}}
+        shell: cmd
+        name: Upload git revision
