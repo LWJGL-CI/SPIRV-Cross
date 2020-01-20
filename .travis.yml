@@ -100,6 +100,36 @@ matrix:
     - "aws s3 cp revision.git s3://build.lwjgl.org/nightly/linux/arm64/libspirv-cross.so.git $S3_PARAMS"
 
   # -----------------
+  - name: "Linux mips64"
+  # -----------------
+    dist: xenial
+    language: c
+    compiler: gcc
+
+    addons:
+      apt:
+        packages:
+        - cmake
+        - gcc-5-mips64el-linux-gnuabi64
+        - g++-5-mips64el-linux-gnuabi64
+        - libc6-dev-mips64el-cross
+
+    before_install:
+    - pip install --user awscli
+    - export PATH=$PATH:$HOME/.local/bin
+
+    script:
+    - mkdir build
+    - cd build
+    - "CC=mips64el-linux-gnuabi64-gcc-5 CXX=mips64el-linux-gnuabi64-g++-5 cmake $LINUX_CMAKE_PARAMS -DCMAKE_C_FLAGS=\"-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0\" .."
+    - cmake --build .
+    - mips64el-linux-gnuabi64-strip libspirv-cross-c-shared.so
+    - "git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > revision.git"
+    - "aws s3 cp libspirv-cross-c-shared.so s3://build.lwjgl.org/nightly/linux/mips64/libspirv-cross.so $S3_PARAMS"
+    - "aws s3 cp revision.git s3://build.lwjgl.org/nightly/linux/mips64/libspirv-cross.so.git $S3_PARAMS"
+
+
+  # -----------------
   - name: "macOS"
   # -----------------
     language: objective-c
