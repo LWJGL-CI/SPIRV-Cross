@@ -65,7 +65,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ARCH: [arm32, arm64, mips64]
+        ARCH: [arm32, arm64, mips64, riscv64]
         include:
           # -----
           - ARCH: arm32
@@ -85,6 +85,12 @@ jobs:
             CC: CC=mips64el-linux-gnuabi64-gcc CXX=mips64el-linux-gnuabi64-g++
             CMAKE_PARAMS: -DCMAKE_TOOLCHAIN_FILE=../XCompile-lwjgl.cmake -DSYSTEM_NAME=Linux -DSYSTEM_PROCESSOR=mips64
             STRIP: mips64el-linux-gnuabi64-strip
+          # -----
+          - ARCH: riscv64
+            PACKAGES: gcc-riscv64-linux-gnu g++-riscv64-linux-gnu libc6-dev-riscv64-cross
+            CC: CC=riscv64-linux-gnu-gcc CXX=riscv64-linux-gnu-g++
+            CMAKE_PARAMS: -DCMAKE_TOOLCHAIN_FILE=../XCompile-lwjgl.cmake -DSYSTEM_NAME=Linux -DSYSTEM_PROCESSOR=riscv64
+            STRIP: riscv64-linux-gnu-strip
     steps:
       - uses: actions/checkout@v3
         with:
